@@ -30,6 +30,7 @@
   #btnLeft { left:3%; bottom:8%; width:12%; aspect-ratio:1/1; font-size:1.3rem; }
   #btnRight { left:17%; bottom:8%; width:12%; aspect-ratio:1/1; font-size:1.3rem; }
   #btnDodge { left:50%; transform:translateX(-50%); bottom:8%; width:12%; aspect-ratio:1/1; }
+  #btnArrowDodge { left:50%; transform:translateX(-50%); bottom:19%; width:12%; aspect-ratio:1/1; }
   #btnLight { right:17%; bottom:8%; width:12%; aspect-ratio:1/1; }
   #btnHeavy { right:3%; bottom:8%; width:12%; aspect-ratio:1/1; }
 </style>
@@ -51,6 +52,7 @@
     <div class="btn" id="btnLeft">◀</div>
     <div class="btn" id="btnRight">▶</div>
     <div class="btn" id="btnDodge">S</div>
+    <div class="btn" id="btnArrowDodge">W</div>
     <div class="btn" id="btnLight">rápido</div>
     <div class="btn" id="btnHeavy">forte</div>
   </div>
@@ -65,7 +67,10 @@
   <div id="endScreen" style="display:none">
     <h1 id="endTitle"></h1>
     <p id="endText"></p>
-    <button class="startBtn" id="restartBtn">JOGAR NOVAMENTE</button>
+    <div style="display:flex; gap:14px; margin-top:22px;">
+      <button class="startBtn" id="restartBtn" style="margin-top:0;">JOGAR NOVAMENTE</button>
+      <button class="startBtn" id="continueBtn" style="margin-top:0; display:none; background:#8fae5a;">CONTINUAR</button>
+    </div>
   </div>
 </div></div>
 <script>
@@ -106,7 +111,7 @@
   const ARCHER = {
     walk: { dir:'assets/archer/walk',   frames:32,  refH:637, fps:8,  loop:true, go:681 },
     idle: { dir:'assets/archer/attack', frames:109, refH:651, fps:14, loop:true, go:693, impactMin:92, impactMax:97, warnFrame:87, dodgeLead:5 },
-    hit:  { dir:'assets/archer/hit',    frames:17,  refH:637, fps:12, loop:false, go:690 },
+    hit:  { dir:'assets/archer/hit',    frames:17,  refH:684, fps:12, loop:false, go:690 },
     dies: { dir:'assets/archer/dies',   frames:48,  refH:637, fps:12, loop:false, go:682 },
   };
 
@@ -156,6 +161,7 @@
   loadSfx('archerShot','arqueiroataque.mp3',0.7);
   loadSfx('shieldHit','soldadocomescudobeinghit.mp3',0.75);
   loadSfx('shieldThrust','shieldthrust.mp3',0.7);
+  loadSfx('bryneSword','brynedrawsword.mp3',0.8);
   loadSfx('bryneEnter','bryneenter.mp3',0.8);
   loadSfx('lightHit','lightstrikekronkhit.mp3',0.8);
   loadSfx('hardHit','hardstrikekronkhit.mp3',0.85);
@@ -534,7 +540,8 @@
     const x=fromLeft?ARENA_MIN_X+10:ARENA_MAX_X-10;
     const a=Fighter('archer',x,!fromLeft,false);
     a.state='walk'; a.fromLeft=fromLeft;
-    a.stationedX = fromLeft ? ARENA_MIN_X+170 : ARENA_MAX_X-170;
+    a.defaultStationedX = fromLeft ? ARENA_MIN_X+170 : ARENA_MAX_X-170;
+    a.stationedX = a.defaultStationedX;
     a.warned=false; a.dodgedByPlayer=false; a.impactResolved=false;
     soldiers.push(a);
     return a;
@@ -761,7 +768,7 @@
       if (s.x<player.x) s.x=Math.min(s.x, player.x-MIN_GAP);
       else s.x=Math.max(s.x, player.x+MIN_GAP);
       for (const o of soldiers){
-        if (o===s || o.gone || o.dead || DYING.includes(o.state)) continue;
+        if (o===s || o.gone || o.dead || DYING.includes(o.state) || o.kind==='archer') continue;
         if (Math.abs(o.x-s.x)<MIN_GAP){ if(s.x<o.x) s.x=o.x-MIN_GAP; else s.x=o.x+MIN_GAP; }
       }
       s.x=clampArena(s.x);
@@ -828,11 +835,31 @@
 
   const ARCHER_DMG=2; // dano da flechada — menos que o ataque forte do Kronk, mais que um golpe leve
 
+  function findEscortSoldier(a){
+    let best=null, bestDist=Infinity;
+    for (const o of soldiers){
+      if (o===a || o.gone || o.dead || DYING.includes(o.state) || o.kind==='archer') continue;
+      const d=Math.abs(o.x-a.x);
+      if (d<bestDist){ bestDist=d; best=o; }
+    }
+    return best;
+  }
+
   function updateArcher(a,dt){
     if (a.invuln>0) a.invuln-=dt;
     if (a.dead){ advanceAnim(a,dt); a.deathTimer-=dt; if(a.deathTimer<=0) a.gone=true; return; }
     if (a.state==='hit'){ advanceAnim(a,dt); return; } // deixa a reação tocar antes de voltar a andar/atirar
     const dx=player.x-a.x;
+
+    const escort=findEscortSoldier(a);
+    const ESCORT_BUFFER=90; // o quanto o arqueiro tenta ficar atrás do soldado vivo mais próximo
+    if (escort){
+      const desired = a.fromLeft ? escort.x-ESCORT_BUFFER : escort.x+ESCORT_BUFFER;
+      // só recua além do normal se o escoltador foi empurrado até perto dele — nunca avança rumo à briga
+      a.stationedX = clampArena(a.fromLeft ? Math.min(a.defaultStationedX, desired) : Math.max(a.defaultStationedX, desired));
+    } else {
+      a.stationedX = a.defaultStationedX;
+    }
 
     if (Math.abs(a.x-a.stationedX)>6){
       a.facingRight = a.stationedX>=a.x;
@@ -1020,6 +1047,7 @@
   bindHold('btnLeft',()=>input.left=true,()=>input.left=false);
   bindHold('btnRight',()=>input.right=true,()=>input.right=false);
   bindHold('btnDodge',()=>{ input.blocking=true; tryDodge(player, incomingAttackerOnPlayer()); },()=>input.blocking=false);
+  bindHold('btnArrowDodge',()=>tryArrowDodge());
   bindHold('btnLight',()=>tryAttack(player,'quick'));
   bindHold('btnHeavy',()=>tryAttack(player,'attack'));
 
@@ -1074,6 +1102,7 @@
       const t=Math.min(1, b.frame/BRYNE_WALK_END_FRAME);
       b.x = b.startX + (b.targetX-b.startX)*t;
       advanceAnim(b,dt);
+      if (!b.swordSoundPlayed && b.frame>=50){ b.swordSoundPlayed=true; play('bryneSword'); }
       if (b.frame>=b.tbl.enter.frames-1) cutscenePhase='fade'; // terminou de puxar a espada
     } else if (cutscenePhase==='fade'){
       cutsceneFade=Math.min(1, cutsceneFade+dt/1.2);
@@ -1091,6 +1120,13 @@
         ? `Bryne chegou e a verdadeira luta de Kronk está por vir.\n\nEsquivas perfeitas: ${statDodges}  •  Golpes leves: ${statLight}  •  Golpes pesados: ${statHeavy}  •  Vida restante: ${player.hp}/${player.maxHp}\n\nPontuação: ${score}`
         : `Você derrubou ${kills} antes de cair.`;
       document.getElementById('endScreen').style.display='flex';
+      const continueBtn=document.getElementById('continueBtn');
+      if (win){
+        continueBtn.style.display='inline-block';
+        continueBtn.onclick=()=>{ window.location.href='https://marcelomartinsjorge.github.io/aq4v-duelo/?score='+score+'&from=bocaseca'; };
+      } else {
+        continueBtn.style.display='none';
+      }
     }, win?200:1200);
   }
   document.getElementById('startBtn').onclick=startGame;
