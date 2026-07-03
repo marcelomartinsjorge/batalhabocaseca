@@ -1,0 +1,44 @@
+{
+  "idle": {
+    "frames": 32,
+    "crop_h": 705,
+    "ground_offset": 688,
+    "ref_height": 661
+  },
+  "walk": {
+    "frames": 48,
+    "crop_h": 718,
+    "ground_offset": 701,
+    "ref_height": 662
+  },
+  "quick": {
+    "frames": 24,
+    "crop_h": 720,
+    "ground_offset": 697,
+    "ref_height": 654
+  },
+  "strong": {
+    "frames": 29,
+    "crop_h": 720,
+    "ground_offset": 703,
+    "ref_height": 668
+  },
+  "hit": {
+    "frames": 13,
+    "crop_h": 720,
+    "ground_offset": 702,
+    "ref_height": 673
+  },
+  "dies": {
+    "frames": 32,
+    "crop_h": 685,
+    "ground_offset": 654,
+    "ref_height": 500
+  },
+  "parry": {
+    "frames": 23,
+    "crop_h": 676,
+    "ground_offset": 651,
+    "ref_height": 622
+  }
+}

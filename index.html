@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Kronk — Boca Seca</title>
+<style>
+  html, body { margin:0; padding:0; background:#000; overflow:hidden; font-family:Georgia,'Times New Roman',serif; height:100%; width:100%; touch-action:none; }
+  #wrap { position:relative; width:100vw; height:100vh; display:flex; align-items:center; justify-content:center; background:#000; }
+  #stage { position:relative; width:100%; max-width:1280px; aspect-ratio:16/9; max-height:100vh; }
+  canvas { width:100%; height:100%; display:block; background:#111; image-rendering:-webkit-optimize-contrast; }
+  #loading, #startScreen, #endScreen { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#e7dcc0; background:rgba(0,0,0,0.82); z-index:30; text-align:center; padding:20px; }
+  #startScreen h1, #endScreen h1 { font-size:2.2rem; margin:0 0 12px; letter-spacing:0.06em; color:#f1e6c8; }
+  #startScreen p, #endScreen p { font-size:1rem; max-width:560px; line-height:1.5; opacity:0.9; white-space:pre-line; }
+  .startBtn { margin-top:22px; padding:12px 34px; font-family:Georgia,serif; font-size:1.1rem; color:#1a1206; background:#d8b451; border:none; border-radius:8px; cursor:pointer; letter-spacing:0.05em; }
+  .startBtn:active { transform:translateY(1px); }
+  #hud { position:absolute; top:12px; left:0; right:0; z-index:10; display:flex; justify-content:space-between; padding:0 18px; color:#f1e6c8; font-size:0.95rem; letter-spacing:0.04em; pointer-events:none; text-shadow:0 2px 4px rgba(0,0,0,0.8); }
+  #hpBar { display:flex; gap:4px; align-items:center; }
+  .pip { width:22px; height:10px; border-radius:2px; background:#7a1414; border:1px solid #3a0a0a; }
+  .pip.full { background:#d63b3b; }
+  #leftHud { display:flex; flex-direction:column; gap:6px; }
+  #staminaWrap { width:190px; height:8px; background:rgba(50,42,26,0.6); border:1px solid rgba(0,0,0,0.5); border-radius:3px; overflow:hidden; }
+  #staminaBar { height:100%; width:100%; background:linear-gradient(#e8c874,#c99a3a); }
+  #hint { position:absolute; bottom:2px; left:50%; transform:translateX(-50%); color:#cdbf99; font-size:0.68rem; z-index:10; pointer-events:none; white-space:nowrap; opacity:0.7; }
+  #hint.mobile { display:none; }
+  .touch-controls { display:none; }
+  @media (pointer:coarse){ #hint.desktop{display:none;} #hint.mobile{display:block;} .touch-controls{display:block;} }
+  .btn { position:absolute; display:flex; align-items:center; justify-content:center; border-radius:50%; background:rgba(220,200,160,0.16); border:2px solid rgba(230,215,180,0.5); color:#f1e6c8; font-size:0.78rem; user-select:none; -webkit-user-select:none; z-index:15; }
+  .btn:active, .btn.active { background:rgba(230,210,150,0.4); }
+  #btnLeft { left:3%; bottom:8%; width:12%; aspect-ratio:1/1; font-size:1.3rem; }
+  #btnRight { left:17%; bottom:8%; width:12%; aspect-ratio:1/1; font-size:1.3rem; }
+  #btnDodge { left:50%; transform:translateX(-50%); bottom:8%; width:12%; aspect-ratio:1/1; }
+  #btnLight { right:17%; bottom:8%; width:12%; aspect-ratio:1/1; }
+  #btnHeavy { right:3%; bottom:8%; width:12%; aspect-ratio:1/1; }
+</style>
+</head>
+<body>
+<div id="wrap"><div id="stage">
+  <div id="loading">carregando…</div>
+  <canvas id="game" width="1280" height="720"></canvas>
+  <div id="hud">
+    <div id="leftHud">
+      <div id="hpBar"></div>
+      <div id="staminaWrap"><div id="staminaBar"></div></div>
+    </div>
+    <div id="killCount">Abates: 0</div>
+  </div>
+  <div id="hint" class="desktop">A / D mover · S esquivar (aperte no "!") · clique ESQ. ataque rápido · clique DIR. ataque forte</div>
+  <div id="hint" class="mobile">mover · esquivar no "!" · atacar</div>
+  <div class="touch-controls">
+    <div class="btn" id="btnLeft">◀</div>
+    <div class="btn" id="btnRight">▶</div>
+    <div class="btn" id="btnDodge">S</div>
+    <div class="btn" id="btnLight">rápido</div>
+    <div class="btn" id="btnHeavy">forte</div>
+  </div>
+  <div id="startScreen">
+    <h1>KRONK — BOCA SECA</h1>
+    <p>O Exército de Redom chegou ao Boca Seca: proteja seu povo.<br><br>
+    <b>A</b> esquerda &nbsp;•&nbsp; <b>D</b> direita<br>
+    <b>S</b> bloqueio e esquiva corpo a corpo &nbsp;•&nbsp; <b>W</b> esquiva à distância<br>
+    <b>Mouse 1</b> ataque rápido &nbsp;•&nbsp; <b>Mouse 2</b> ataque forte</p>
+    <button class="startBtn" id="startBtn">COMEÇAR</button>
+  </div>
+  <div id="endScreen" style="display:none">
+    <h1 id="endTitle"></h1>
+    <p id="endText"></p>
+    <button class="startBtn" id="restartBtn">JOGAR NOVAMENTE</button>
+  </div>
+</div></div>
+<script>
+(function(){
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const CW = canvas.width, CH = canvas.height;
+  const GROUND_Y = 660;
+  const ARENA_MIN_X = 120, ARENA_MAX_X = CW - 120;
+  const MOVE_SPEED = 300;
+
+  const KRONK_H = 300;
+  const SOLDIER_H = Math.round(KRONK_H * 1.80 / 2.20);
+
+  const KRONK = {
+    idle:   { dir:'assets/kronk/idle',    frames:36, refH:640, fps:8,  loop:true,  go:656 },
+    walk:   { dir:'assets/kronk/walk',    frames:30, refH:466, fps:24, loop:true,  go:502 },
+    attack: { dir:'assets/kronk/attack',  frames:64, refH:505, fps:16, loop:false, go:564, impactMin:24, impactMax:40, dodgeLead:10, range:340, cleave:true },
+    quick:  { dir:'assets/kronk/attack_quick', frames:16, refH:644, fps:13, loop:false, go:666, impactMin:6, impactMax:12, dodgeLead:3 },
+    hit_l:  { dir:'assets/kronk/hit_l',    frames:39, refH:650, fps:14, loop:false, go:704, noMirror:true }, // golpe vindo da esquerda
+    hit_r:  { dir:'assets/kronk/hit_r',    frames:39, refH:650, fps:14, loop:false, go:704, noMirror:true }, // golpe vindo da direita
+    block:  { dir:'assets/kronk/block',   frames:32, refH:650, fps:10, loop:true,  go:675 },
+    dodge:  { dir:'assets/kronk/dodge',   frames:28, refH:657, fps:16, loop:false, go:706 },
+    death_l:{ dir:'assets/kronk/death_l', frames:32, refH:665, fps:12, loop:false, go:690, noMirror:true },
+    death_r:{ dir:'assets/kronk/death_r', frames:32, refH:665, fps:12, loop:false, go:690, noMirror:true },
+  };
+  const SOLDIER = {
+    idle:   { dir:'assets/soldier/idle',   frames:32, refH:662, fps:8,  loop:true,  go:703 }, // guarda baixa — janela vulnerável
+    walk:   { dir:'assets/soldier/walk',   frames:42, refH:679, fps:24, loop:true,  go:700 },
+    quick:  { dir:'assets/soldier/quick_new', frames:37, refH:671, fps:20, loop:false, go:703, impactMin:18, impactMax:24, dodgeLead:7 },
+    strong: { dir:'assets/soldier/strong', frames:29, refH:668, fps:13, loop:false, go:703, impactMin:14, impactMax:20, dodgeLead:10 },
+    hit:    { dir:'assets/soldier/hit',    frames:12, refH:690, fps:12, loop:false, go:701 },
+    defense:{ dir:'assets/soldier/defense',frames:32, refH:652, fps:8,  loop:true,  go:701 }, // guarda — estado padrão
+    dies:   { dir:'assets/soldier/dies',   frames:32, refH:641, fps:12, loop:false, go:654 },
+    parry:  { dir:'assets/soldier/parry',  frames:26, refH:622, fps:14, loop:false, go:681, impactMin:16, impactMax:20 }, // contra-ataque
+  };
+
+  const ARCHER = {
+    walk: { dir:'assets/archer/walk',   frames:32,  refH:637, fps:8,  loop:true, go:681 },
+    idle: { dir:'assets/archer/attack', frames:109, refH:651, fps:14, loop:true, go:693, impactMin:92, impactMax:97, warnFrame:87, dodgeLead:5 },
+    dies: { dir:'assets/archer/dies',   frames:48,  refH:637, fps:12, loop:false, go:682 },
+  };
+
+  const SHIELD = {
+    walk:    { dir:'assets/shield/walk',    frames:32, refH:637, fps:8,  loop:true,  go:680 },
+    defense: { dir:'assets/shield/defense', frames:32, refH:625, fps:8,  loop:true,  go:682 },
+    hit:     { dir:'assets/shield/hit',     frames:48, refH:640, fps:12, loop:false, go:692 },
+    thrust:  { dir:'assets/shield/thrust',  frames:56, refH:592, fps:14, loop:false, go:678, impactMin:26, impactMax:32, dodgeLead:9 },
+    broken:  { dir:'assets/shield/broken',  frames:48, refH:645, fps:12, loop:false, go:713 },
+  };
+
+  const BRYNE = {
+    enter: { dir:'assets/bryne/enter', frames:78, refH:1044, fps:14, loop:false, go:1208 },
+  };
+
+  const bgImg = new Image();
+  let toLoad = 1, loaded = 0;
+  function onLoad(){ loaded++; if (loaded >= toLoad) document.getElementById('loading').style.display='none'; }
+  bgImg.onload=onLoad; bgImg.onerror=onLoad; bgImg.src='assets/bg/bocaseca.png';
+
+  function loadTable(tbl, targetH){
+    for (const key in tbl){
+      const a=tbl[key]; a.scale=targetH/a.refH; a.images=[]; toLoad+=a.frames;
+      for (let i=0;i<a.frames;i++){
+        const img=new Image(); img.onload=onLoad; img.onerror=onLoad;
+        img.src=`${a.dir}/${String(i).padStart(2,'0')}.png`; a.images.push(img);
+      }
+    }
+  }
+  loadTable(KRONK, KRONK_H);
+  loadTable(SOLDIER, SOLDIER_H);
+  loadTable(ARCHER, SOLDIER_H);
+  loadTable(SHIELD, SOLDIER_H);
+  loadTable(BRYNE, SOLDIER_H);
+
+  const SFX={};
+  function loadSfx(n,f,v){ const a=new Audio(`assets/audio/${f}`); a.volume=v??1; SFX[n]=a; }
+  loadSfx('kronkQuick','kronkquickattack.mp3',0.7);
+  loadSfx('kronkStrong','kronkstrongattack.mp3',0.8);
+  loadSfx('kronkDodge','kronkesquiva.mp3',0.7);
+  loadSfx('kronkHit1','kronkbeenhit1.mp3',0.8);
+  loadSfx('kronkHit2','kronkbeenhit2.mp3',0.8);
+  loadSfx('kill1','kronkmata1.mp3',0.85);
+  loadSfx('kill2','kronkmata2.mp3',0.85);
+  loadSfx('kill3','kronkmata3.mp3',0.85);
+  loadSfx('solAttack','soldadoattacksound.mp3',0.5);
+  loadSfx('archerShot','arqueiroataque.mp3',0.7);
+  loadSfx('shieldHit','soldadocomescudobeinghit.mp3',0.75);
+  loadSfx('shieldThrust','shieldthrust.mp3',0.7);
+  loadSfx('bryneEnter','bryneenter.mp3',0.8);
+  loadSfx('lightHit','lightstrikekronkhit.mp3',0.8);
+  loadSfx('hardHit','hardstrikekronkhit.mp3',0.85);
+  const music=new Audio('assets/audio/musicadojogoemlooping.mp3'); music.loop=true; music.volume=0.35;
+  const solWalkSound=new Audio('assets/audio/soldadowalkingsound.mp3'); solWalkSound.loop=true; solWalkSound.volume=0.32;
+  let solWalkPlaying=false;
+  function updateWalkAmbience(){
+    const anyWalking = soldiers.some(s=>!s.gone && !s.dead && s.state==='walk');
+    if (anyWalking && !solWalkPlaying){ solWalkPlaying=true; solWalkSound.currentTime=0; solWalkSound.play().catch(()=>{}); }
+    else if (!anyWalking && solWalkPlaying){ solWalkPlaying=false; solWalkSound.pause(); }
+  }
+  function play(n){ const a=SFX[n]; if(!a) return; try{ a.currentTime=0; a.play().catch(()=>{}); }catch(e){} }
+  function playOneOf(ns){ play(ns[Math.floor(Math.random()*ns.length)]); }
+
+  const CROSSFADE_MS=180, DODGE_COOLDOWN=0.7, MIN_GAP=130, HIT_RANGE=210;
+  const MAX_HP_KRONK=8, MAX_HP_SOLDIER=4, ARCHER_HP=2;
+  const BLOCK_REDUCTION=0.7; // held block soaks 70% of incoming damage
+  const STAMINA_MAX=100;
+  const STAMINA_COST={quick:50, attack:100, strong:55, thrust:40};
+  const STAMINA_REGEN_IDLE=14, STAMINA_REGEN_WALK=10;
+  const BLOCK_STAMINA_DRAIN=5; // holding block costs stamina over time — only a perfect dodge is free
+  const ONE_SHOT=['attack','quick','strong','thrust','hit','hit_l','hit_r','dodge','parry','dies','death_l','death_r','broken'];
+  const ATTACKING=['attack','quick','strong','thrust'];
+  const DYING=['dies','death_l','death_r'];
+  const DMG={attack:4,quick:1,strong:4,thrust:1};
+  const KNOCKBACK={attack:150,quick:90,strong:160,thrust:70};
+
+  function Fighter(kind,x,facingRight,isPlayer){
+    const maxHp = kind==='kronk' ? MAX_HP_KRONK : kind==='archer' ? ARCHER_HP : MAX_HP_SOLDIER;
+    const tbl = kind==='kronk' ? KRONK : kind==='archer' ? ARCHER : kind==='shield' ? SHIELD : SOLDIER;
+    return { kind, tbl, x, facingRight, isPlayer,
+      state:'idle', frame:0, frameTimer:0, transition:null, hitApplied:false,
+      hp:maxHp, maxHp, dead:false, deathTimer:0, gone:false, invuln:0, dodgeCd:0,
+      aiTimer:0.8+Math.random()*0.8, flashTimer:0, blocking:false, willBlock:false,
+      stamina:STAMINA_MAX };
+  }
+
+  function setState(f,newState,opt){
+    opt=opt||{};
+    if (!opt.force && f.state===newState && !ONE_SHOT.includes(newState)) return;
+    const a=f.tbl[newState]; if(!a) return;
+    const specialFrom=ONE_SHOT.includes(f.state), specialTo=ONE_SHOT.includes(newState);
+    f.transition=(specialFrom||specialTo)
+      ? { fromState:f.state, fromFrame:Math.min(f.frame,f.tbl[f.state].frames-1), fromFacingRight:f.facingRight, elapsed:0, duration:CROSSFADE_MS }
+      : null;
+    f.state=newState; f.frame=0; f.frameTimer=0;
+    if (ATTACKING.includes(newState)) f.hitApplied=false;
+  }
+  function canAct(f){ return !f.dead && !ONE_SHOT.includes(f.state); }
+  function clampArena(x){ return Math.max(ARENA_MIN_X, Math.min(ARENA_MAX_X, x)); }
+
+  function tryAttack(f,type){
+    if (cutsceneActive) return;
+    if (!canAct(f) || ATTACKING.includes(f.state) || f.state==='dodge') return;
+    if (f.kind==='kronk' && meleeThreatOnPlayer()) return; // um golpe já está a caminho — só dá pra esquivar ou bloquear, não trocar
+    if (f.stamina < STAMINA_COST[type]){
+      if (f.kind==='kronk') spawnFloatingText(f.x, GROUND_Y-f.tbl.idle.go*f.tbl.idle.scale-20, 'Sem Estamina', '#ff6b6b');
+      return; // not enough stamina to even attempt the move — no partial/chip attacks
+    }
+    f.stamina = Math.max(0, f.stamina - STAMINA_COST[type]);
+    setState(f,type);
+    if (f.kind==='kronk') play(type==='quick'?'kronkQuick':'kronkStrong');
+    else if (f.kind==='shield') play('shieldThrust');
+    else play('solAttack');
+  }
+
+  function tryDodge(f,opponent){
+    if (cutsceneActive) return;
+    // no cooldown and no "already dodging" block: a second dodge can cancel/chain from
+    // an active one, since two attackers can threaten Kronk almost at once.
+    if (f.dead || DYING.includes(f.state) || ATTACKING.includes(f.state)) return;
+    if (!opponent || !ATTACKING.includes(opponent.state)) return;
+    const oa=opponent.tbl[opponent.state];
+    if (oa.dodgeable === false) return; // heavy attacks can't be dodged, only quick ones
+    const wMin=oa.impactMin-oa.dodgeLead, wMax=oa.impactMin-1;
+    if (opponent.frame<wMin || opponent.frame>wMax) return;
+    const framesLeft=(oa.impactMax-opponent.frame)+2;
+    f.invuln=framesLeft/oa.fps;
+    setState(f,'dodge',{force:true});
+    f.facingRight = opponent.x >= f.x; // ends the dodge facing the soldier, front-on
+    spawnSpark(f.x, GROUND_Y - f.tbl.idle.go*f.tbl.idle.scale*0.6);
+    spawnFloatingText(f.x, GROUND_Y - f.tbl.idle.go*f.tbl.idle.scale - 20, 'Esquiva');
+    play('kronkDodge');
+    dropGuard(opponent); // reward the read: the soldier's guard drops wide open
+    statDodges++;
+  }
+
+  function landHit(attacker,defender){
+    if (defender.invuln>0 || defender.dead || DYING.includes(defender.state)) return;
+    if (defender.kind==='shield'){ landHitShield(attacker,defender); return; }
+
+    if (attacker.kind==='kronk') play(attacker.state==='attack' ? 'hardHit' : 'lightHit');
+
+    const fullDmg = DMG[attacker.state]||1;
+    const isBlocking = defender.state==='block';
+    const dmg = isBlocking ? Math.round(fullDmg*(1-BLOCK_REDUCTION)) : fullDmg;
+    defender.hp -= dmg;
+    if (defender.kind==='kronk') updateHUD();
+
+    const hitDir = defender.x>=attacker.x ? 1 : -1;
+    const anchorTbl = defender.tbl.idle || defender.tbl.defense || defender.tbl.walk;
+    const impactY = GROUND_Y-anchorTbl.go*anchorTbl.scale*0.6;
+    if (isBlocking) spawnSpark(defender.x, impactY);
+    else spawnBlood(defender.x, impactY, hitDir);
+
+    // impact "juice": brief freeze + camera shake + white flash, scaled by how hard the hit was
+    const heavy = attacker.state==='attack';
+    const softened = isBlocking ? 0.5 : 1;
+    hitstopTimer = (heavy ? 0.11 : 0.06) * softened;
+    shakeTimer = (heavy ? 0.22 : 0.12) * softened;
+    shakeMag = (heavy ? 14 : 7) * softened;
+    // (white hit-flash removed — it kept causing rendering glitches)
+
+    if (defender.hp<=0){
+      defender.dead=true;
+      const atkRight=attacker.x>=defender.x; // where the killing blow came from
+      if (defender.kind==='kronk'){
+        defender.deathTimer=0; // let the loop's (deathTimer||1.6) fallback apply the real countdown
+        // fall/face TOWARD whoever landed the killing blow, not away from them
+        setState(defender, atkRight?'death_r':'death_l', {force:true});
+      } else {
+        defender.deathTimer=999; // sentinel, immediately overwritten below by onEnemyKilled
+        setState(defender,'dies',{force:true});
+        defender.facingRight = atkRight; // pin facing toward the killer, don't trust stale AI facing
+        onEnemyKilled(defender);
+      }
+    } else if (isBlocking){
+      // a held block absorbs most of the hit — stays in guard, only a small pushback, no stagger
+      defender.x=clampArena(defender.x+hitDir*(KNOCKBACK[attacker.state]||90)*0.3);
+    } else {
+      const dir=defender.x>=attacker.x?1:-1;
+      defender.x=clampArena(defender.x+dir*(KNOCKBACK[attacker.state]||90));
+      if (defender.kind==='kronk') setState(defender, dir<0?'hit_r':'hit_l', {force:true});
+      else setState(defender,'hit',{force:true});
+      if (defender.kind==='kronk') playOneOf(['kronkHit1','kronkHit2']);
+    }
+  }
+
+  function landHitShield(attacker,defender){
+    if (defender.state==='broken') return; // já quebrando — ignora novos golpes até a animação terminar e transformar
+    // ataques leves não fazem nada além de tocar a reação do escudo; só golpes fortes contam pra quebrar
+    const heavy = attacker.state==='attack';
+    if (attacker.kind==='kronk') play(heavy?'hardHit':'lightHit');
+    play('shieldHit');
+    const hitDir = defender.x>=attacker.x ? 1 : -1;
+    const impactY = GROUND_Y-defender.tbl.defense.go*defender.tbl.defense.scale*0.6;
+    spawnSpark(defender.x, impactY);
+    hitstopTimer=heavy?0.11:0.06; shakeTimer=heavy?0.22:0.12; shakeMag=heavy?14:7;
+    defender.x=clampArena(defender.x+hitDir*20); // pequeno recuo, escudo absorve o resto
+
+    if (!heavy){
+      setState(defender,'hit',{force:true});
+      return; // ataque leve não conta pra quebrar o escudo
+    }
+    defender.heavyHitsTaken=(defender.heavyHitsTaken||0)+1;
+    if (defender.heavyHitsTaken>=2){
+      setState(defender,'broken',{force:true});
+      defender.shieldBreaking=true; // vira soldado normal quando essa animação terminar
+    } else {
+      setState(defender,'hit',{force:true});
+    }
+  }
+
+  const particles=[];
+  const bloodPools=[];
+  const floatingTexts=[];
+
+  function spawnFloatingText(x,y,text,color){
+    floatingTexts.push({x,y,text,color:color||'#ffe27a',age:0,life:0.9});
+  }
+  function updateFloatingTexts(dt){
+    for (let i=floatingTexts.length-1;i>=0;i--){
+      const t=floatingTexts[i]; t.age+=dt;
+      if (t.age>=t.life) floatingTexts.splice(i,1);
+    }
+  }
+  function drawFloatingTexts(){
+    for (const t of floatingTexts){
+      const p=t.age/t.life;
+      const rise = p*34;
+      const alpha = p<0.15 ? p/0.15 : Math.max(0,1-(p-0.15)/0.85);
+      ctx.save();
+      ctx.globalAlpha=alpha;
+      ctx.translate(t.x, t.y-rise);
+      ctx.font='bold 26px Georgia, serif';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.lineWidth=4; ctx.strokeStyle='#2a1a00'; ctx.strokeText(t.text,0,0);
+      ctx.fillStyle=t.color; ctx.fillText(t.text,0,0);
+      ctx.restore();
+    }
+    ctx.globalAlpha=1;
+  }
+
+  function spawnBlood(x,y,dirX){
+    // directional spray: mostly away from the hit, with spread, plus a few droplets flung the other way
+    const n = 26 + Math.floor(Math.random()*10);
+    for (let i=0;i<n;i++){
+      const spread = (Math.random()-0.5) * Math.PI * 0.9;
+      const baseAng = dirX >= 0 ? 0 : Math.PI;
+      const ang = baseAng + spread;
+      const sp = 90 + Math.random()*260;
+      const big = Math.random() < 0.3;
+      particles.push({
+        x, y,
+        vx: Math.cos(ang)*sp,
+        vy: Math.sin(ang)*sp*0.5 - (80+Math.random()*120),
+        life: 0.45+Math.random()*0.45, age:0,
+        size: big ? 4.5+Math.random()*4 : 1.5+Math.random()*2.5,
+        dark: Math.random()<0.4, // uma fração mais escura/coagulada pra variar o tom
+        spark:false,
+      });
+    }
+    // a few fine mist particles for texture
+    for (let i=0;i<10;i++){
+      const ang = Math.random()*Math.PI*2;
+      const sp = 40+Math.random()*90;
+      particles.push({x,y,vx:Math.cos(ang)*sp, vy:Math.sin(ang)*sp*0.5-30,
+        life:0.3+Math.random()*0.25, age:0, size:1+Math.random()*1.5, dark:false, spark:false});
+    }
+    // baforada de neblina vermelha bem breve no ponto de impacto — dá "peso" ao golpe
+    particles.push({x,y,vx:0,vy:-20,life:0.22,age:0,size:26+Math.random()*10,dark:false,spark:false,mist:true});
+    // ground pool: lands roughly under the hit, grows in, lingers, fades out slowly
+    bloodPools.push({
+      x: x + dirX*(20+Math.random()*30), y: GROUND_Y - 4 + Math.random()*4,
+      r: 16+Math.random()*10, maxR: 30+Math.random()*22,
+      age:0, growTime:0.35, holdTime:4.5, fadeTime:2.2,
+      seed: Math.random()*1000, dirX,
+    });
+  }
+  function spawnSpark(x,y){
+    for (let i=0;i<10;i++){
+      const ang=Math.random()*Math.PI*2, sp=80+Math.random()*140;
+      particles.push({x,y,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp*0.6,
+        life:0.25+Math.random()*0.2, age:0, size:2+Math.random()*2.5, spark:true});
+    }
+  }
+  function updateParticles(dt){
+    for (let i=particles.length-1;i>=0;i--){
+      const p=particles[i]; p.age+=dt;
+      if (p.age>=p.life){ particles.splice(i,1); continue; }
+      if (!p.spark && !p.mist) p.vy+=500*dt;
+      p.x+=p.vx*dt; p.y+=p.vy*dt;
+    }
+  }
+  function drawParticles(){
+    for (const p of particles){
+      const t=1-p.age/p.life;
+      if (p.mist){
+        ctx.globalAlpha=Math.max(0,t)*0.35;
+        const grad=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.size);
+        grad.addColorStop(0,'#7a0f0f'); grad.addColorStop(1,'rgba(122,15,15,0)');
+        ctx.fillStyle=grad;
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fill();
+        continue;
+      }
+      ctx.globalAlpha=Math.max(0,t);
+      if (p.spark){
+        ctx.fillStyle=t>0.5?'#eaf6ff':'#9fd8ff';
+        ctx.fillRect(p.x-p.size/2,p.y-p.size/2,p.size,p.size);
+        continue;
+      }
+      // gotas alongadas na direção do movimento, em vez de quadrados — lê mais como líquido
+      const speed=Math.hypot(p.vx,p.vy)||1;
+      const stretch=Math.min(2.6, 1+speed/220);
+      ctx.save();
+      ctx.translate(p.x,p.y);
+      ctx.rotate(Math.atan2(p.vy,p.vx));
+      ctx.fillStyle = p.dark ? '#5a0d0d' : (t>0.5?'#b81c1c':'#7a1010');
+      ctx.beginPath();
+      ctx.ellipse(0,0,p.size*stretch*0.5,p.size*0.5,0,0,Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.globalAlpha=1;
+  }
+
+  function updateBloodPools(dt){
+    for (let i=bloodPools.length-1;i>=0;i--){
+      const b=bloodPools[i]; b.age+=dt;
+      const total=b.growTime+b.holdTime+b.fadeTime;
+      if (b.age>=total) bloodPools.splice(i,1);
+    }
+  }
+  function drawBloodPools(){
+    for (const b of bloodPools){
+      let alpha;
+      if (b.age<b.growTime) alpha = b.age/b.growTime;
+      else if (b.age<b.growTime+b.holdTime) alpha = 1;
+      else alpha = Math.max(0, 1-(b.age-b.growTime-b.holdTime)/b.fadeTime);
+      const r = Math.min(b.age/b.growTime,1) * b.maxR;
+      if (r<=0 || alpha<=0) continue;
+      ctx.save();
+      ctx.globalAlpha = alpha*0.8;
+      // a few overlapping irregular blobs read as an organic pool rather than a perfect circle
+      for (let k=0;k<4;k++){
+        const ang = b.seed + k*1.7;
+        const ox = Math.cos(ang)*r*0.35, oy = Math.sin(ang)*r*0.18;
+        const rr = r*(0.55+0.18*Math.sin(b.seed+k));
+        ctx.beginPath();
+        ctx.ellipse(b.x+ox, b.y+oy, rr, rr*0.42, 0, 0, Math.PI*2);
+        ctx.fillStyle = k%2===0 ? '#4a0a0a' : '#6b0f0f';
+        ctx.fill();
+      }
+      // rabo de respingo na direção do golpe — quebra a simetria, lê mais como impacto real
+      if (b.dirX){
+        ctx.beginPath();
+        ctx.ellipse(b.x+b.dirX*r*0.9, b.y, r*0.5, r*0.16, 0, 0, Math.PI*2);
+        ctx.fillStyle='#5a0d0d';
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    ctx.globalAlpha=1;
+  }
+
+  const birds=[];
+  let birdTimer=8+Math.random()*15;
+  function spawnBirdFlock(){
+    const fromLeft=Math.random()<0.5;
+    const n=2+Math.floor(Math.random()*3);
+    const baseY=40+Math.random()*90;
+    const vx=(fromLeft?1:-1)*(55+Math.random()*25);
+    for (let i=0;i<n;i++){
+      birds.push({
+        x: fromLeft?-40-i*34:CW+40+i*34,
+        y: baseY+i*14+Math.random()*10,
+        vx, size: 7+Math.random()*3,
+        wing: Math.random()*Math.PI*2,
+        life: 30, age:0,
+      });
+    }
+  }
+  function updateBirds(dt){
+    birdTimer-=dt;
+    if (birdTimer<=0){ spawnBirdFlock(); birdTimer=18+Math.random()*22; }
+    for (let i=birds.length-1;i>=0;i--){
+      const b=birds[i]; b.age+=dt; b.x+=b.vx*dt; b.wing+=dt*9;
+      if (b.x<-80 || b.x>CW+80) birds.splice(i,1);
+    }
+  }
+  function drawBirds(){
+    ctx.save();
+    ctx.strokeStyle='rgba(30,26,22,0.55)';
+    ctx.lineWidth=2;
+    for (const b of birds){
+      const flap=Math.sin(b.wing)*0.5+0.5; // 0..1
+      const wingY=-flap*b.size*0.9;
+      ctx.beginPath();
+      ctx.moveTo(b.x-b.size, b.y+wingY);
+      ctx.quadraticCurveTo(b.x-b.size*0.3, b.y-b.size*0.3, b.x, b.y);
+      ctx.quadraticCurveTo(b.x+b.size*0.3, b.y-b.size*0.3, b.x+b.size, b.y+wingY);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  const player=Fighter('kronk',CW*0.5,true,true);
+
+  let soldiers=[]; // todos os inimigos: kind 'soldier' | 'archer' | 'shield'
+  let kills=0; // contador exibido no HUD — não é mais a condição de vitória
+  let statDodges=0, statLight=0, statHeavy=0; // pra tela de estatísticas no final
+  let gameTime=0; let running=false, ended=false;
+  let hitstopTimer=0, shakeTimer=0, shakeMag=0;
+  const input={left:false,right:false,blocking:false};
+
+  function spawnSoldier(fromLeftOverride){
+    const fromLeft = fromLeftOverride!==undefined ? fromLeftOverride : Math.random()<0.5;
+    const x=fromLeft?ARENA_MIN_X+10:ARENA_MAX_X-10;
+    const s=Fighter('soldier',x,!fromLeft,false);
+    s.state='walk'; s.fromLeft=fromLeft;
+    soldiers.push(s);
+    return s;
+  }
+
+  function spawnArcher(fromLeft){
+    const x=fromLeft?ARENA_MIN_X+10:ARENA_MAX_X-10;
+    const a=Fighter('archer',x,!fromLeft,false);
+    a.state='walk'; a.fromLeft=fromLeft;
+    a.stationedX = fromLeft ? ARENA_MIN_X+170 : ARENA_MAX_X-170;
+    a.warned=false; a.dodgedByPlayer=false; a.impactResolved=false;
+    soldiers.push(a);
+    return a;
+  }
+
+  function spawnShield(fromLeftOverride){
+    const fromLeft = fromLeftOverride!==undefined ? fromLeftOverride : Math.random()<0.5;
+    const x=fromLeft?ARENA_MIN_X+10:ARENA_MAX_X-10;
+    const s=Fighter('shield',x,!fromLeft,false);
+    s.state='walk'; s.fromLeft=fromLeft;
+    s.heavyHitsTaken=0;
+    soldiers.push(s);
+    return s;
+  }
+
+  function onEnemyKilled(s){
+    kills++; play('kill1'); updateHUD();
+    const dTbl=s.tbl.dies;
+    s.deathTimer=dTbl.frames/dTbl.fps+0.6;
+  }
+
+  // ---- Diretor de waves ----
+  // 0: soldado sozinho (spawn inicial em resetGame). 1: soldado+arqueiro. 2: escudo+arqueiro.
+  // 3: escudo+2 arqueiros (final). 4: vitória.
+  let waveStage=0, waveGroup=[], waveExpected=1, pendingActions=[], lastSide=true, wonAnnounced=false;
+  let cutsceneActive=false, cutsceneBryne=null, cutscenePhase='', cutsceneTimer=0, cutsceneFade=0;
+
+  function scheduleAction(dmin,dmax,fn){ pendingActions.push({time:gameTime+dmin+Math.random()*(dmax-dmin), fn}); }
+
+  function updateWaves(dt){
+    for (let i=pendingActions.length-1;i>=0;i--){
+      if (gameTime>=pendingActions[i].time){
+        const item=pendingActions.splice(i,1)[0];
+        item.fn();
+      }
+    }
+    if (!ended && waveGroup.length>0 && waveGroup.length>=waveExpected && waveGroup.every(f=>f.gone)){
+      advanceWave();
+    }
+  }
+
+  function advanceWave(){
+    waveStage++;
+    waveGroup=[];
+    if (waveStage===1){
+      waveExpected=2;
+      scheduleAction(1,5, ()=>{
+        const s=spawnSoldier(); lastSide=s.fromLeft; waveGroup.push(s);
+        scheduleAction(1,3, ()=>{ waveGroup.push(spawnArcher(lastSide)); });
+      });
+    } else if (waveStage===2){
+      waveExpected=2;
+      scheduleAction(1,5, ()=>{
+        const sh=spawnShield(); lastSide=sh.fromLeft; waveGroup.push(sh);
+        scheduleAction(1,3, ()=>{ waveGroup.push(spawnArcher(lastSide)); });
+      });
+    } else if (waveStage===3){
+      waveExpected=3;
+      scheduleAction(1,10, ()=>{
+        const sh=spawnShield(); lastSide=sh.fromLeft; waveGroup.push(sh);
+        scheduleAction(1,3, ()=>{
+          waveGroup.push(spawnArcher(lastSide));
+          scheduleAction(5,5, ()=>{ waveGroup.push(spawnArcher(lastSide)); });
+        });
+      });
+    } else if (waveStage>=4){
+      if (!wonAnnounced){ wonAnnounced=true; startVictoryCutscene(); }
+    }
+  }
+
+  const GUARD_DROP_MIN = 2.2, GUARD_DROP_MAX = 4.6; // variável de propósito — o player não pode "ler" o ritmo
+  const GUARD_DOWN_DURATION = 1.0; // 1s de guarda baixa
+  const SOLDIER_COUNTER_SWING_CHANCE = 0.5; // chance de golpear de volta durante a guarda baixa, se tiver estamina
+  const COUNTER_DMG = 2; // contra-ataque automático — menos que o golpe forte do soldado (4); segurar bloqueio reduz ainda mais
+
+  function nextGuardTimer(){ return GUARD_DROP_MIN + Math.random()*(GUARD_DROP_MAX-GUARD_DROP_MIN); }
+
+  function enterGuardDown(s){
+    setState(s,'idle',{force:true});
+    s.guardDownTimer = GUARD_DOWN_DURATION;
+    s.guardDownAttackDecided = false;
+  }
+
+  function dropGuard(s){ // chamado quando o Kronk consegue uma Esquiva — abre a guarda na hora, como recompensa
+    if (!s || s.dead || DYING.includes(s.state) || s.state==='hit') return;
+    enterGuardDown(s);
+  }
+
+  function triggerCounter(s, attacker){ // Kronk atacou o soldado enquanto ele estava em 'defense' — contra-ataque automático, imparável
+    setState(s,'parry',{force:true});
+    s.facingRight = attacker.x >= s.x;
+    s.counterPending = true;
+    spawnSpark(s.x, GROUND_Y - s.tbl.parry.go*s.tbl.parry.scale*0.6);
+    spawnFloatingText(s.x, GROUND_Y - s.tbl.parry.go*s.tbl.parry.scale - 20, 'Contra-Ataque');
+  }
+
+  function updateSoldierAI(s,dt){
+    if (s.dead || DYING.includes(s.state) || s.state==='hit') return;
+    const dx=player.x-s.x, dist=Math.abs(dx);
+
+    if (s.state==='parry'){ s.facingRight=dx>=0; return; } // contra-ataque tocando — nada a decidir
+
+    if (ATTACKING.includes(s.state)) return; // comprometido com o próprio golpe, deixa terminar
+
+    if (dist>MIN_GAP+30){
+      s.facingRight=dx>=0;
+      s.x=clampArena(s.x+Math.sign(dx)*MOVE_SPEED*0.62*dt);
+      if (s.state!=='walk') setState(s,'walk');
+      return;
+    }
+
+    if (s.state==='walk'){
+      setState(s,'defense');
+      s.guardTimer = nextGuardTimer();
+      return;
+    }
+
+    if (s.state==='defense'){
+      s.facingRight=dx>=0;
+      s.guardTimer-=dt;
+      if (s.guardTimer<=0) enterGuardDown(s);
+    } else if (s.state==='idle'){
+      if (!s.guardDownAttackDecided){
+        s.guardDownAttackDecided=true;
+        // pode revidar durante a própria brecha, se tiver fôlego — risco pro player que tentar o ataque forte aqui
+        if (s.stamina>=STAMINA_COST.quick && Math.random()<SOLDIER_COUNTER_SWING_CHANCE) tryAttack(s,'quick');
+      }
+      s.guardDownTimer-=dt;
+      if (s.guardDownTimer<=0 && s.state==='idle'){
+        setState(s,'defense');
+        s.guardTimer = nextGuardTimer();
+      }
+    }
+  }
+
+  function advanceAnim(f,dt){
+    const a=f.tbl[f.state];
+    if (f.transition){ f.transition.elapsed+=dt*1000; if(f.transition.elapsed>=f.transition.duration) f.transition=null; }
+    f.frameTimer+=dt; const fd=1/a.fps;
+    while (f.frameTimer>=fd){
+      f.frameTimer-=fd; f.frame++;
+      if (f.frame>=a.frames){
+        if (a.loop){
+          f.transition = { fromState:f.state, fromFrame:a.frames-1, fromFacingRight:f.facingRight, elapsed:0, duration:CROSSFADE_MS };
+          f.frame=0;
+        }
+        else {
+          f.frame=a.frames-1;
+          if (DYING.includes(f.state)){ /* hold last frame */ }
+          else if (f.kind==='shield'){
+            if (f.shieldBreaking){
+              // escudo quebrou de vez — vira soldado normal, com as mesmas habilidades.
+              // corte direto (sem crossfade): as tabelas são diferentes, então não dá pra misturar os dois frames.
+              f.kind='soldier'; f.tbl=SOLDIER; f.shieldBreaking=false;
+              f.hp=MAX_HP_SOLDIER; f.maxHp=MAX_HP_SOLDIER;
+              f.state='defense'; f.frame=0; f.frameTimer=0; f.transition=null; f.guardTimer=nextGuardTimer();
+            } else {
+              setState(f,'defense',{force:true});
+            }
+          }
+          else if (f.kind==='soldier') setState(f,'defense',{force:true});
+          else setState(f,'idle',{force:true});
+          return;
+        }
+      }
+    }
+  }
+
+  function updateStamina(f,dt){
+    if (f.state==='idle' || f.state==='defense') f.stamina=Math.min(STAMINA_MAX, f.stamina+STAMINA_REGEN_IDLE*dt);
+    else if (f.state==='walk') f.stamina=Math.min(STAMINA_MAX, f.stamina+STAMINA_REGEN_WALK*dt);
+    else if (f.state==='block') f.stamina=Math.max(0, f.stamina-BLOCK_STAMINA_DRAIN*dt);
+    // attacking, hit, dodge/parry, and dying: frozen — no regen, no drain
+  }
+
+  function nearestLiveSoldier(){
+    let best=null, bestDist=Infinity;
+    for (const s of soldiers){
+      if (s.gone || s.dead || DYING.includes(s.state)) continue;
+      const d=Math.abs(s.x-player.x);
+      if (d<bestDist){ bestDist=d; best=s; }
+    }
+    return best;
+  }
+
+  function updatePlayer(dt){
+    if (player.invuln>0) player.invuln-=dt;
+    if (wDodgeCooldown>0) wDodgeCooldown-=dt;
+    if (player.dodgeCd>0) player.dodgeCd-=dt;
+    if (player.dead){ advanceAnim(player,dt); return; }
+    updateStamina(player,dt);
+    if (canAct(player)){
+      const ns=nearestLiveSoldier();
+      if (input.blocking){
+        if (player.state!=='block') setState(player,'block');
+        if (ns) player.facingRight = ns.x>=player.x; // keep facing the threat for the whole block, not just on entry
+      } else {
+        let moving=false;
+        if (input.left && !input.right){ player.x-=MOVE_SPEED*dt; player.facingRight=false; moving=true; }
+        else if (input.right && !input.left){ player.x+=MOVE_SPEED*dt; player.facingRight=true; moving=true; }
+        if (moving){
+          for (const s of soldiers){
+            if (s.gone || DYING.includes(s.state)) continue;
+            if (player.x<s.x) player.x=Math.min(player.x, s.x-MIN_GAP);
+            else player.x=Math.max(player.x, s.x+MIN_GAP);
+          }
+        } else if (ns && canAct(player) && player.state!=='dodge'){
+          player.facingRight = ns.x>=player.x; // idle/attacking: always square up to the nearest soldier
+        }
+        player.x=clampArena(player.x);
+        if (player.state==='idle'||player.state==='walk'||player.state==='block') setState(player, moving?'walk':'idle');
+      }
+    }
+    checkSwingHits(player, soldiers);
+    advanceAnim(player,dt);
+  }
+
+  function updateSoldier(s,dt){
+    if (s.invuln>0) s.invuln-=dt;
+    if (s.dead){ advanceAnim(s,dt); s.deathTimer-=dt; if(s.deathTimer<=0) s.gone=true; return; }
+    updateStamina(s,dt);
+    updateSoldierAI(s,dt);
+    if (!DYING.includes(s.state) && s.state==='walk'){
+      if (s.x<player.x) s.x=Math.min(s.x, player.x-MIN_GAP);
+      else s.x=Math.max(s.x, player.x+MIN_GAP);
+      for (const o of soldiers){
+        if (o===s || o.gone || o.dead || DYING.includes(o.state)) continue;
+        if (Math.abs(o.x-s.x)<MIN_GAP){ if(s.x<o.x) s.x=o.x-MIN_GAP; else s.x=o.x+MIN_GAP; }
+      }
+      s.x=clampArena(s.x);
+    }
+    if (s.state==='parry' && s.counterPending && s.frame>=s.tbl.parry.impactMin){
+      s.counterPending=false;
+      landCounterHit(s,player);
+    }
+    checkSwingHits(s, [player]);
+    advanceAnim(s,dt);
+  }
+
+  function landCounterHit(attacker,defender){
+    // contra-ataque automático: Kronk não pode esquivar, mas segurar bloqueio ainda abona parte do dano
+    if (defender.dead || DYING.includes(defender.state)) return;
+    const isBlocking = defender.state==='block';
+    const dmg = isBlocking ? Math.max(0, Math.round(COUNTER_DMG*(1-BLOCK_REDUCTION))) : COUNTER_DMG;
+    defender.hp -= dmg;
+    updateHUD();
+    const hitDir = defender.x>=attacker.x ? 1 : -1;
+    const impactY = GROUND_Y-defender.tbl.idle.go*defender.tbl.idle.scale*0.6;
+    if (isBlocking) spawnSpark(defender.x, impactY); else spawnBlood(defender.x, impactY, hitDir);
+    hitstopTimer=0.08; shakeTimer=0.16; shakeMag=9;
+    if (defender.hp<=0){
+      defender.dead=true; defender.deathTimer=0; // let the loop's (deathTimer||1.6) fallback apply the real countdown
+      setState(defender, attacker.x>=defender.x?'death_r':'death_l', {force:true});
+    } else if (isBlocking){
+      defender.x=clampArena(defender.x+hitDir*20); // holds guard, only a small pushback — no stagger
+    } else {
+      defender.x=clampArena(defender.x+hitDir*70);
+      setState(defender, hitDir<0?'hit_r':'hit_l', {force:true});
+      playOneOf(['kronkHit1','kronkHit2']);
+    }
+  }
+
+  function updateShield(s,dt){
+    if (s.invuln>0) s.invuln-=dt;
+    if (s.dead){ advanceAnim(s,dt); s.deathTimer-=dt; if(s.deathTimer<=0) s.gone=true; return; }
+    if (s.state==='hit' || s.state==='broken'){ advanceAnim(s,dt); return; } // reação em andamento, não decide nada
+    if (s.state==='thrust'){
+      s.facingRight = player.x>=s.x;
+      checkSwingHits(s, [player]);
+      advanceAnim(s,dt); return;
+    }
+    const dx=player.x-s.x, dist=Math.abs(dx);
+    if (dist>MIN_GAP+30){
+      s.facingRight=dx>=0;
+      s.x=clampArena(s.x+Math.sign(dx)*MOVE_SPEED*0.55*dt); // escudeiro pesado, um pouco mais lento
+      if (s.state!=='walk') setState(s,'walk');
+      advanceAnim(s,dt); return;
+    }
+    if (s.state==='walk'){ setState(s,'defense'); s.thrustTimer=2+Math.random()*2; }
+    if (s.state==='defense'){
+      s.facingRight=dx>=0;
+      s.thrustTimer=(s.thrustTimer===undefined?2+Math.random()*2:s.thrustTimer)-dt;
+      if (s.thrustTimer<=0 && s.stamina>=STAMINA_COST.thrust){
+        tryAttack(s,'thrust');
+        s.thrustTimer=2.5+Math.random()*2.5;
+      }
+    }
+    updateStamina(s,dt);
+    advanceAnim(s,dt);
+  }
+
+  const ARCHER_DMG=2; // dano da flechada — menos que o ataque forte do Kronk, mais que um golpe leve
+
+  function updateArcher(a,dt){
+    if (a.invuln>0) a.invuln-=dt;
+    if (a.dead){ advanceAnim(a,dt); a.deathTimer-=dt; if(a.deathTimer<=0) a.gone=true; return; }
+    const dx=player.x-a.x;
+
+    if (Math.abs(a.x-a.stationedX)>6){
+      a.facingRight = a.stationedX>=a.x;
+      a.x += Math.sign(a.stationedX-a.x)*MOVE_SPEED*0.5*dt;
+      if (a.state!=='walk') setState(a,'walk');
+      advanceAnim(a,dt); return;
+    }
+    a.x=a.stationedX;
+    if (a.state!=='idle'){ setState(a,'idle'); a.warned=false; a.dodgedByPlayer=false; a.impactResolved=false; play('archerShot'); }
+    a.facingRight=dx>=0;
+
+    const tbl=a.tbl.idle;
+    if (!a.warned && a.frame>=tbl.warnFrame){
+      a.warned=true;
+      spawnFloatingText(player.x, GROUND_Y-KRONK_H-40, '!!!', '#ff3b3b');
+    }
+    if (!a.impactResolved && a.frame>=tbl.impactMin){
+      a.impactResolved=true;
+      resolveArcherHit(a);
+    }
+    advanceAnim(a,dt);
+    if (a.frame===0){ a.warned=false; a.impactResolved=false; a.dodgedByPlayer=false; play('archerShot'); } // ciclo reiniciou — próximo tiro
+  }
+
+  function resolveArcherHit(a){
+    if (a.dodgedByPlayer || player.dead) return; // Esquiva perfeita (W) — flecha não acerta
+    const isBlocking = player.state==='block';
+    const dmg = isBlocking ? Math.max(0, Math.round(ARCHER_DMG*(1-BLOCK_REDUCTION))) : ARCHER_DMG;
+    player.hp -= dmg;
+    updateHUD();
+    const hitDir = player.x>=a.x ? 1 : -1;
+    const impactY = GROUND_Y-KRONK.idle.go*KRONK.idle.scale*0.6;
+    if (isBlocking) spawnSpark(player.x, impactY); else spawnBlood(player.x, impactY, hitDir);
+    hitstopTimer=0.08; shakeTimer=0.16; shakeMag=9;
+    if (player.hp<=0){
+      player.dead=true; player.deathTimer=0;
+      setState(player, a.x>=player.x?'death_r':'death_l', {force:true});
+    } else if (isBlocking){
+      player.x=clampArena(player.x+hitDir*20); // segura a guarda, só um recuo pequeno
+    } else {
+      player.x=clampArena(player.x+hitDir*50);
+      setState(player, hitDir<0?'hit_r':'hit_l', {force:true});
+      playOneOf(['kronkHit1','kronkHit2']);
+    }
+  }
+
+  let wDodgeCooldown=0;
+  function tryArrowDodge(){
+    if (cutsceneActive || wDodgeCooldown>0) return;
+    wDodgeCooldown=0.5; // trava o botão por meio segundo — mashing não substitui reagir ao aviso
+    for (const a of soldiers){
+      if (a.kind!=='archer' || a.dead || a.gone || a.state!=='idle' || a.dodgedByPlayer) continue;
+      const tbl=a.tbl.idle;
+      const wMin=tbl.impactMin-tbl.dodgeLead, wMax=tbl.impactMin-1;
+      if (a.frame>=wMin && a.frame<=wMax){
+        a.dodgedByPlayer=true;
+        setState(player,'dodge',{force:true});
+        spawnFloatingText(player.x, GROUND_Y-KRONK.idle.go*KRONK.idle.scale-20, 'Esquiva', '#7CFC00');
+        play('kronkDodge');
+        statDodges++;
+      }
+    }
+  }
+
+  function checkSwingHits(attacker, targets){
+    if (!ATTACKING.includes(attacker.state) || attacker.hitApplied) return;
+    const a=attacker.tbl[attacker.state];
+    if (attacker.frame<a.impactMin || attacker.frame>a.impactMax) return;
+    const range = a.range || HIT_RANGE;
+    let hitSomething = false;
+    for (const t of targets){
+      if (t.gone||t.dead||DYING.includes(t.state)) continue;
+      const dist=Math.abs(t.x-attacker.x);
+      const facing=(t.x-attacker.x>=0)===attacker.facingRight;
+      if (dist<=range && facing){
+        if (attacker.kind==='kronk' && t.kind==='soldier' && t.state==='defense'){
+          triggerCounter(t, attacker);
+        } else {
+          landHit(attacker,t);
+        }
+        hitSomething = true;
+        if (!a.cleave) break; // normal attacks stop at the first target; a cleave keeps going
+      }
+    }
+    if (hitSomething){
+      attacker.hitApplied=true;
+      if (attacker.kind==='kronk'){
+        if (attacker.state==='attack') statHeavy++;
+        else if (attacker.state==='quick') statLight++;
+      }
+    }
+  }
+
+  function incomingAttackerOnPlayer(){
+    for (const s of soldiers){
+      if (s.gone || s.kind==='archer' || !ATTACKING.includes(s.state)) continue;
+      const oa=s.tbl[s.state];
+      if (oa.dodgeable === false) continue;
+      const wMin=oa.impactMin-oa.dodgeLead, wMax=oa.impactMin-1;
+      if (s.frame<wMin || s.frame>wMax) continue;
+      const dist=Math.abs(player.x-s.x);
+      const facing=(player.x-s.x>=0)===s.facingRight;
+      if (dist<=HIT_RANGE && facing) return s;
+    }
+    return null;
+  }
+
+  function meleeThreatOnPlayer(){
+    // diferente de incomingAttackerOnPlayer: cobre o golpe inteiro (não só a janela de esquiva),
+    // pra impedir o Kronk de simplesmente atacar antes do golpe do soldado chegar.
+    for (const s of soldiers){
+      if (s.gone || s.kind==='archer' || !ATTACKING.includes(s.state)) continue;
+      const dist=Math.abs(player.x-s.x);
+      const facing=(player.x-s.x>=0)===s.facingRight;
+      if (dist<=HIT_RANGE && facing) return true;
+    }
+    return false;
+  }
+
+  function drawBackground(){
+    if (!bgImg.complete || bgImg.naturalWidth===0){ ctx.fillStyle='#1a1512'; ctx.fillRect(0,0,CW,CH); return; }
+    const iw=bgImg.naturalWidth, ih=bgImg.naturalHeight;
+    const sc=Math.max(CW/iw,CH/ih), dw=iw*sc, dh=ih*sc;
+    ctx.drawImage(bgImg,(CW-dw)/2,(CH-dh)/2,dw,dh);
+  }
+  function drawFrame(f,stateKey,frameIdx,alpha,facingOverride){
+    const a=f.tbl[stateKey];
+    const img=a.images[Math.min(frameIdx,a.frames-1)];
+    if (!img||!img.complete||img.naturalWidth===0) return;
+    const dw=img.naturalWidth*a.scale, dh=img.naturalHeight*a.scale;
+    const drawY=GROUND_Y-a.go*a.scale;
+    ctx.save(); ctx.globalAlpha=alpha; ctx.translate(f.x,0);
+    const facing=facingOverride!==undefined?facingOverride:f.facingRight;
+    const flip=a.noMirror?1:(a.invert?(facing?-1:1):(facing?1:-1)); ctx.scale(flip,1);
+    ctx.drawImage(img,-dw/2,drawY,dw,dh);
+    ctx.restore();
+  }
+  function drawFighter(f){
+    const flick=f.invuln>0?(Math.floor(f.invuln*30)%2===0?0.55:0.9):1;
+    if (f.transition){
+      const t=Math.min(1,f.transition.elapsed/f.transition.duration);
+      drawFrame(f,f.transition.fromState,f.transition.fromFrame,(1-t)*flick,f.transition.fromFacingRight);
+      drawFrame(f,f.state,f.frame,t*flick,f.facingRight);
+    } else drawFrame(f,f.state,f.frame,flick);
+  }
+  function drawDodgePrompt(){
+    if (!incomingAttackerOnPlayer()) return;
+    const headY=GROUND_Y-KRONK_H-22;
+    const pulse=1+Math.sin(performance.now()/55)*0.14;
+    ctx.save(); ctx.translate(player.x,headY); ctx.scale(pulse,pulse);
+    ctx.font='bold 46px Georgia, serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.lineWidth=6; ctx.strokeStyle='#3a1000'; ctx.strokeText('!',0,0);
+    ctx.fillStyle='#ffce3d'; ctx.fillText('!',0,0); ctx.restore();
+  }
+
+  function updateHUD(){
+    const bar=document.getElementById('hpBar'); bar.innerHTML='';
+    for (let i=0;i<player.maxHp;i++){ const d=document.createElement('div'); d.className='pip'+(i<player.hp?' full':''); bar.appendChild(d); }
+    document.getElementById('killCount').textContent=`Abates: ${kills}`;
+  }
+
+  window.addEventListener('keydown',e=>{
+    if (e.repeat) return;
+    const k=e.key.toLowerCase();
+    if (k==='a'||k==='arrowleft') input.left=true;
+    if (k==='d'||k==='arrowright') input.right=true;
+    if (k==='s'||k==='arrowdown'){ input.blocking=true; tryDodge(player, incomingAttackerOnPlayer()); }
+    if (k==='w'||k==='arrowup'){ tryArrowDodge(); }
+  });
+  window.addEventListener('keyup',e=>{
+    const k=e.key.toLowerCase();
+    if (k==='a'||k==='arrowleft') input.left=false;
+    if (k==='d'||k==='arrowright') input.right=false;
+    if (k==='s'||k==='arrowdown') input.blocking=false;
+  });
+  canvas.addEventListener('contextmenu',e=>e.preventDefault());
+  canvas.addEventListener('mousedown',e=>{ if(!running) return; tryAttack(player, e.button===2?'attack':'quick'); });
+
+  function bindHold(id,on,off){
+    const el=document.getElementById(id); if(!el) return;
+    el.addEventListener('pointerdown',e=>{e.preventDefault();el.classList.add('active');on();});
+    const up=e=>{e.preventDefault();el.classList.remove('active');if(off)off();};
+    el.addEventListener('pointerup',up); el.addEventListener('pointercancel',up); el.addEventListener('pointerleave',up);
+  }
+  bindHold('btnLeft',()=>input.left=true,()=>input.left=false);
+  bindHold('btnRight',()=>input.right=true,()=>input.right=false);
+  bindHold('btnDodge',()=>{ input.blocking=true; tryDodge(player, incomingAttackerOnPlayer()); },()=>input.blocking=false);
+  bindHold('btnLight',()=>tryAttack(player,'quick'));
+  bindHold('btnHeavy',()=>tryAttack(player,'attack'));
+
+  function resetGame(){
+    player.x=CW*0.5; player.facingRight=true; player.state='idle'; player.frame=0;
+    player.frameTimer=0; player.transition=null; player.hp=player.maxHp; player.dead=false;
+    player.invuln=0; player.dodgeCd=0; player.hitApplied=false; player.deathTimer=0; player.flashTimer=0;
+    player.stamina=STAMINA_MAX;
+    soldiers=[]; kills=0; gameTime=0; ended=false; particles.length=0; bloodPools.length=0; floatingTexts.length=0;
+    hitstopTimer=0; shakeTimer=0;
+    waveStage=0; pendingActions=[]; wonAnnounced=false;
+    statDodges=0; statLight=0; statHeavy=0;
+    cutsceneActive=false; cutsceneBryne=null; cutscenePhase=''; cutsceneTimer=0; cutsceneFade=0;
+    updateHUD();
+    const first=spawnSoldier(); lastSide=first.fromLeft;
+    waveGroup=[first]; waveExpected=1;
+  }
+  function startGame(){
+    document.getElementById('startScreen').style.display='none';
+    document.getElementById('endScreen').style.display='none';
+    resetGame(); running=true; music.play().catch(()=>{});
+  }
+  const BRYNE_WALK_END_FRAME=18; // ela só desloca de verdade nos primeiros ~18 frames (passos); depois disso é o saque da espada
+  const BRYNE_STEP_DISTANCE=34; // distância real que ela percorre nesses passos, medida no próprio vídeo (não é pra chegar perto do Kronk)
+
+  let bryneFromLeft=true; // guardado aqui pra ficar consistente entre o momento em que o Kronk vira e o momento em que ela realmente entra
+
+  function startVictoryCutscene(){
+    play('kill3');
+    setTimeout(()=>play('kill2'), 2573);
+    setTimeout(()=>beginBryneEntrance(), 2573+1733); // só entra depois dos DOIS áudios terminarem
+    bryneFromLeft = player.x >= CW/2; // ela vai entrar pelo lado OPOSTO de onde o Kronk está
+    player.facingRight = !bryneFromLeft; // Kronk já fica de frente pro lado que ela vai entrar
+    setState(player,'idle',{force:true});
+    cutsceneActive=true; // trava o controle do player já — a entrada da Bryne só acontece depois, mas o Kronk já não responde mais
+  }
+
+  function beginBryneEntrance(){
+    const fromLeft = bryneFromLeft;
+    const restX = fromLeft ? ARENA_MIN_X+150 : ARENA_MAX_X-150; // onde ela fica parada, visível, perto da borda
+    const x = fromLeft ? restX-BRYNE_STEP_DISTANCE : restX+BRYNE_STEP_DISTANCE; // entra de fora, dá o passo real até restX
+    cutsceneBryne = { kind:'bryne', tbl:BRYNE, x, startX:x, facingRight:fromLeft, state:'enter', frame:0, frameTimer:0, transition:null, invuln:0 };
+    cutsceneBryne.targetX = restX;
+    cutscenePhase='walk'; cutsceneFade=0;
+  }
+
+  function updateCutscene(dt){
+    const b=cutsceneBryne;
+    if (cutscenePhase==='walk'){
+      // posição amarrada ao progresso real dos passos dela (só nos primeiros frames) — depois
+      // disso ela já plantou os pés, então a posição para de mudar mesmo a animação seguindo pro saque da espada.
+      const t=Math.min(1, b.frame/BRYNE_WALK_END_FRAME);
+      b.x = b.startX + (b.targetX-b.startX)*t;
+      advanceAnim(b,dt);
+      if (b.frame>=b.tbl.enter.frames-1) cutscenePhase='fade'; // terminou de puxar a espada
+    } else if (cutscenePhase==='fade'){
+      cutsceneFade=Math.min(1, cutsceneFade+dt/1.2);
+      if (cutsceneFade>=1 && cutscenePhase!=='done'){ cutscenePhase='done'; endGame(true); }
+    }
+  }
+
+  function endGame(win){
+    ended=true; running=false;
+    solWalkSound.pause(); solWalkPlaying=false;
+    const score = win ? Math.round(player.hp*100 + statDodges*50) : 0;
+    setTimeout(()=>{
+      document.getElementById('endTitle').textContent=win?'VITÓRIA':'KRONK CAIU';
+      document.getElementById('endText').textContent=win
+        ? `Bryne chegou e a verdadeira luta de Kronk está por vir.\n\nEsquivas perfeitas: ${statDodges}  •  Golpes leves: ${statLight}  •  Golpes pesados: ${statHeavy}  •  Vida restante: ${player.hp}/${player.maxHp}\n\nPontuação: ${score}`
+        : `Você derrubou ${kills} antes de cair.`;
+      document.getElementById('endScreen').style.display='flex';
+    }, win?200:1200);
+  }
+  document.getElementById('startBtn').onclick=startGame;
+  document.getElementById('restartBtn').onclick=startGame;
+
+  let lastTime=performance.now();
+  function loop(now){
+    let dt=Math.min(0.05,(now-lastTime)/1000); lastTime=now;
+
+    if (hitstopTimer>0){
+      hitstopTimer=Math.max(0,hitstopTimer-dt);
+      dt=0; // freeze gameplay this frame, but still render (sells the impact)
+    }
+
+    if (running){
+      gameTime+=dt;
+      if (cutsceneActive){
+        advanceAnim(player,dt);
+        updateCutscene(dt);
+      } else {
+        updateWaves(dt);
+        if (!cutsceneActive) updatePlayer(dt);
+        for (const s of soldiers){
+          if (s.kind==='archer') updateArcher(s,dt);
+          else if (s.kind==='shield') updateShield(s,dt);
+          else updateSoldier(s,dt);
+        }
+        soldiers=soldiers.filter(s=>!s.gone);
+        for (const f of [player,...soldiers]) if (f.flashTimer>0) f.flashTimer-=dt;
+        const staminaBar = document.getElementById('staminaBar');
+        if (staminaBar) staminaBar.style.width = Math.max(0, player.stamina/STAMINA_MAX*100) + '%';
+        if (player.dead && !ended){
+          player.deathTimer=(player.deathTimer||1.6)-dt;
+          if (player.deathTimer<=0) endGame(false);
+        }
+      }
+      updateParticles(dt);
+      updateBloodPools(dt);
+      updateFloatingTexts(dt);
+      updateBirds(dt);
+      updateWalkAmbience();
+    }
+    if (shakeTimer>0) shakeTimer=Math.max(0,shakeTimer-dt);
+
+    ctx.clearRect(0,0,CW,CH);
+    ctx.save();
+    if (shakeTimer>0){
+      const falloff = shakeTimer / 0.22;
+      ctx.translate((Math.random()-0.5)*shakeMag*falloff, (Math.random()-0.5)*shakeMag*falloff);
+    }
+    drawBackground();
+    drawBirds();
+    drawBloodPools();
+    const all=[player,...soldiers].filter(f=>f&&f.tbl);
+    if (cutsceneActive && cutsceneBryne) all.push(cutsceneBryne);
+    all.sort((a,b)=>a.x-b.x);
+    for (const f of all) drawFighter(f);
+    drawParticles();
+    drawFloatingTexts();
+    if (running && !cutsceneActive) drawDodgePrompt();
+    if (cutsceneActive && cutsceneFade>0){
+      ctx.fillStyle=`rgba(0,0,0,${cutsceneFade})`;
+      ctx.fillRect(0,0,CW,CH);
+    }
+    ctx.restore();
+    requestAnimationFrame(loop);
+  }
+  updateHUD();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
