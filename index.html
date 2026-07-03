@@ -83,7 +83,7 @@
   const KRONK = {
     idle:   { dir:'assets/kronk/idle',    frames:36, refH:640, fps:8,  loop:true,  go:656 },
     walk:   { dir:'assets/kronk/walk',    frames:30, refH:466, fps:24, loop:true,  go:502 },
-    attack: { dir:'assets/kronk/attack',  frames:64, refH:505, fps:16, loop:false, go:564, impactMin:24, impactMax:40, dodgeLead:10, range:340, cleave:true },
+    attack: { dir:'assets/kronk/attack',  frames:64, refH:505, fps:16, loop:false, go:564, impactMin:24, impactMax:40, dodgeLead:10, range:340 },
     quick:  { dir:'assets/kronk/attack_quick', frames:16, refH:644, fps:13, loop:false, go:666, impactMin:6, impactMax:12, dodgeLead:3 },
     hit_l:  { dir:'assets/kronk/hit_l',    frames:39, refH:650, fps:14, loop:false, go:704, noMirror:true }, // golpe vindo da esquerda
     hit_r:  { dir:'assets/kronk/hit_r',    frames:39, refH:650, fps:14, loop:false, go:704, noMirror:true }, // golpe vindo da direita
@@ -831,6 +831,7 @@
   function updateArcher(a,dt){
     if (a.invuln>0) a.invuln-=dt;
     if (a.dead){ advanceAnim(a,dt); a.deathTimer-=dt; if(a.deathTimer<=0) a.gone=true; return; }
+    if (a.state==='hit'){ advanceAnim(a,dt); return; } // deixa a reação tocar antes de voltar a andar/atirar
     const dx=player.x-a.x;
 
     if (Math.abs(a.x-a.stationedX)>6){
