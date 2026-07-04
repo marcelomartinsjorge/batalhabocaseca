@@ -602,12 +602,11 @@
         scheduleAction(1,3, ()=>{ waveGroup.push(spawnArcher(lastSide)); });
       });
     } else if (waveStage===3){
-      waveExpected=3;
+      waveExpected=2;
       scheduleAction(1,10, ()=>{
-        const sh=spawnShield(); lastSide=sh.fromLeft; waveGroup.push(sh);
-        scheduleAction(1,3, ()=>{
-          waveGroup.push(spawnArcher(lastSide));
-          scheduleAction(5,5, ()=>{ waveGroup.push(spawnArcher(lastSide)); });
+        const sh1=spawnShield(); waveGroup.push(sh1);
+        scheduleAction(2,4, ()=>{
+          const sh2=spawnShield(!sh1.fromLeft); waveGroup.push(sh2); // o segundo entra sempre pelo lado oposto do primeiro
         });
       });
     } else if (waveStage>=4){
