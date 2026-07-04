@@ -1,5 +1,0 @@
-{
-  "idle":   {"frames": 10, "ref_height": 1100, "mode": "grounded"},
-  "walk":   {"frames": 30, "crop_h": 544, "ground_offset": 502, "mode": "stable"},
-  "attack": {"frames": 64, "crop_h": 608, "ground_offset": 564, "ref_height": 505, "mode": "stable"}
-}

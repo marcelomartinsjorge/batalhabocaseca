@@ -86,45 +86,45 @@
   const SOLDIER_H = Math.round(KRONK_H * 1.80 / 2.20);
 
   const KRONK = {
-    idle:   { dir:'assets/kronk/idle',    frames:36, refH:640, fps:8,  loop:true,  go:656 },
-    walk:   { dir:'assets/kronk/walk',    frames:30, refH:466, fps:24, loop:true,  go:502 },
-    attack: { dir:'assets/kronk/attack',  frames:64, refH:505, fps:16, loop:false, go:564, impactMin:24, impactMax:40, dodgeLead:10, range:340 },
-    quick:  { dir:'assets/kronk/attack_quick', frames:16, refH:644, fps:13, loop:false, go:666, impactMin:6, impactMax:12, dodgeLead:3 },
-    hit_l:  { dir:'assets/kronk/hit_l',    frames:39, refH:650, fps:14, loop:false, go:704, noMirror:true }, // golpe vindo da esquerda
-    hit_r:  { dir:'assets/kronk/hit_r',    frames:39, refH:650, fps:14, loop:false, go:704, noMirror:true }, // golpe vindo da direita
-    block:  { dir:'assets/kronk/block',   frames:32, refH:650, fps:10, loop:true,  go:675 },
-    dodge:  { dir:'assets/kronk/dodge',   frames:28, refH:657, fps:16, loop:false, go:706 },
-    death_l:{ dir:'assets/kronk/death_l', frames:32, refH:665, fps:12, loop:false, go:690, noMirror:true },
-    death_r:{ dir:'assets/kronk/death_r', frames:32, refH:665, fps:12, loop:false, go:690, noMirror:true },
+    idle:   { dir:'assets/kronk/idle',    frames:36, refH:320, fps:8,  loop:true,  go:328 },
+    walk:   { dir:'assets/kronk/walk',    frames:30, refH:233, fps:24, loop:true,  go:251 },
+    attack: { dir:'assets/kronk/attack',  frames:64, refH:252.5, fps:16, loop:false, go:282, impactMin:24, impactMax:40, dodgeLead:10, range:340 },
+    quick:  { dir:'assets/kronk/attack_quick', frames:16, refH:322, fps:13, loop:false, go:333, impactMin:6, impactMax:12, dodgeLead:3 },
+    hit_l:  { dir:'assets/kronk/hit_l',    frames:39, refH:325, fps:14, loop:false, go:352, noMirror:true }, // golpe vindo da esquerda
+    hit_r:  { dir:'assets/kronk/hit_r',    frames:39, refH:325, fps:14, loop:false, go:352, noMirror:true }, // golpe vindo da direita
+    block:  { dir:'assets/kronk/block',   frames:32, refH:325, fps:10, loop:true,  go:337.5 },
+    dodge:  { dir:'assets/kronk/dodge',   frames:28, refH:328.5, fps:16, loop:false, go:353 },
+    death_l:{ dir:'assets/kronk/death_l', frames:32, refH:332.5, fps:12, loop:false, go:345, noMirror:true },
+    death_r:{ dir:'assets/kronk/death_r', frames:32, refH:332.5, fps:12, loop:false, go:345, noMirror:true },
   };
   const SOLDIER = {
-    idle:   { dir:'assets/soldier/idle',   frames:32, refH:662, fps:8,  loop:true,  go:703 }, // guarda baixa — janela vulnerável
-    walk:   { dir:'assets/soldier/walk',   frames:42, refH:679, fps:24, loop:true,  go:700 },
-    quick:  { dir:'assets/soldier/quick_new', frames:37, refH:671, fps:20, loop:false, go:703, impactMin:18, impactMax:24, dodgeLead:7 },
-    strong: { dir:'assets/soldier/strong', frames:29, refH:668, fps:13, loop:false, go:703, impactMin:14, impactMax:20, dodgeLead:10 },
-    hit:    { dir:'assets/soldier/hit',    frames:12, refH:690, fps:12, loop:false, go:701 },
-    defense:{ dir:'assets/soldier/defense',frames:32, refH:652, fps:8,  loop:true,  go:701 }, // guarda — estado padrão
-    dies:   { dir:'assets/soldier/dies',   frames:32, refH:641, fps:12, loop:false, go:654 },
-    parry:  { dir:'assets/soldier/parry',  frames:26, refH:622, fps:14, loop:false, go:681, impactMin:16, impactMax:20 }, // contra-ataque
+    idle:   { dir:'assets/soldier/idle',   frames:32, refH:331, fps:8,  loop:true,  go:351.5 }, // guarda baixa — janela vulnerável
+    walk:   { dir:'assets/soldier/walk',   frames:42, refH:339.5, fps:24, loop:true,  go:350 },
+    quick:  { dir:'assets/soldier/quick_new', frames:37, refH:335.5, fps:20, loop:false, go:351.5, impactMin:18, impactMax:24, dodgeLead:7 },
+    strong: { dir:'assets/soldier/strong', frames:29, refH:334, fps:13, loop:false, go:351.5, impactMin:14, impactMax:20, dodgeLead:10 },
+    hit:    { dir:'assets/soldier/hit',    frames:12, refH:345, fps:12, loop:false, go:350.5 },
+    defense:{ dir:'assets/soldier/defense',frames:32, refH:326, fps:8,  loop:true,  go:350.5 }, // guarda — estado padrão
+    dies:   { dir:'assets/soldier/dies',   frames:32, refH:320.5, fps:12, loop:false, go:327 },
+    parry:  { dir:'assets/soldier/parry',  frames:26, refH:311, fps:14, loop:false, go:340.5, impactMin:16, impactMax:20 }, // contra-ataque
   };
 
   const ARCHER = {
-    walk: { dir:'assets/archer/walk',   frames:32,  refH:637, fps:8,  loop:true, go:681 },
-    idle: { dir:'assets/archer/attack', frames:109, refH:651, fps:14, loop:true, go:693, impactMin:92, impactMax:97, warnFrame:87, dodgeLead:5 },
-    hit:  { dir:'assets/archer/hit',    frames:17,  refH:651, fps:12, loop:false, go:690 },
-    dies: { dir:'assets/archer/dies',   frames:48,  refH:637, fps:12, loop:false, go:682 },
+    walk: { dir:'assets/archer/walk',   frames:32,  refH:318.5, fps:8,  loop:true, go:340.5 },
+    idle: { dir:'assets/archer/attack', frames:109, refH:325.5, fps:14, loop:true, go:346.5, impactMin:92, impactMax:97, warnFrame:87, dodgeLead:5 },
+    hit:  { dir:'assets/archer/hit',    frames:17,  refH:325.5, fps:12, loop:false, go:345 },
+    dies: { dir:'assets/archer/dies',   frames:48,  refH:318.5, fps:12, loop:false, go:341 },
   };
 
   const SHIELD = {
-    walk:    { dir:'assets/shield/walk',    frames:32, refH:637, fps:8,  loop:true,  go:680 },
-    defense: { dir:'assets/shield/defense', frames:32, refH:625, fps:8,  loop:true,  go:682 },
-    hit:     { dir:'assets/shield/hit',     frames:48, refH:640, fps:12, loop:false, go:692 },
-    thrust:  { dir:'assets/shield/thrust',  frames:56, refH:592, fps:14, loop:false, go:678, impactMin:26, impactMax:32, dodgeLead:9 },
-    broken:  { dir:'assets/shield/broken',  frames:48, refH:645, fps:12, loop:false, go:713 },
+    walk:    { dir:'assets/shield/walk',    frames:32, refH:318.5, fps:8,  loop:true,  go:340 },
+    defense: { dir:'assets/shield/defense', frames:32, refH:312.5, fps:8,  loop:true,  go:341 },
+    hit:     { dir:'assets/shield/hit',     frames:48, refH:320, fps:12, loop:false, go:346 },
+    thrust:  { dir:'assets/shield/thrust',  frames:56, refH:296, fps:14, loop:false, go:339, impactMin:26, impactMax:32, dodgeLead:9 },
+    broken:  { dir:'assets/shield/broken',  frames:48, refH:322.5, fps:12, loop:false, go:356.5 },
   };
 
   const BRYNE = {
-    enter: { dir:'assets/bryne/enter', frames:78, refH:1044, fps:14, loop:false, go:1208 },
+    enter: { dir:'assets/bryne/enter', frames:78, refH:522, fps:14, loop:false, go:604 },
   };
 
   const bgImg = new Image();
@@ -134,11 +134,14 @@
 
   function loadTable(tbl, targetH){
     for (const key in tbl){
-      const a=tbl[key]; a.scale=targetH/a.refH; a.images=[]; toLoad+=a.frames;
-      for (let i=0;i<a.frames;i++){
-        const img=new Image(); img.onload=onLoad; img.onerror=onLoad;
-        img.src=`${a.dir}/${String(i).padStart(2,'0')}.png`; a.images.push(img);
-      }
+      const a=tbl[key]; a.scale=targetH/a.refH; toLoad+=1;
+      a.cols=Math.ceil(Math.sqrt(a.frames));
+      a.rows=Math.ceil(a.frames/a.cols);
+      const img=new Image();
+      img.onload=()=>{ a.frameW=img.naturalWidth/a.cols; a.frameH=img.naturalHeight/a.rows; onLoad(); };
+      img.onerror=onLoad;
+      img.src=`${a.dir}.png`;
+      a.sheet=img;
     }
   }
   loadTable(KRONK, KRONK_H);
@@ -987,14 +990,16 @@
   }
   function drawFrame(f,stateKey,frameIdx,alpha,facingOverride){
     const a=f.tbl[stateKey];
-    const img=a.images[Math.min(frameIdx,a.frames-1)];
-    if (!img||!img.complete||img.naturalWidth===0) return;
-    const dw=img.naturalWidth*a.scale, dh=img.naturalHeight*a.scale;
+    const img=a.sheet;
+    if (!img||!img.complete||img.naturalWidth===0||!a.frameW) return;
+    const idx=Math.min(frameIdx,a.frames-1);
+    const sx=(idx%a.cols)*a.frameW, sy=Math.floor(idx/a.cols)*a.frameH;
+    const dw=a.frameW*a.scale, dh=a.frameH*a.scale;
     const drawY=GROUND_Y-a.go*a.scale;
     ctx.save(); ctx.globalAlpha=alpha; ctx.translate(f.x,0);
     const facing=facingOverride!==undefined?facingOverride:f.facingRight;
     const flip=a.noMirror?1:(a.invert?(facing?-1:1):(facing?1:-1)); ctx.scale(flip,1);
-    ctx.drawImage(img,-dw/2,drawY,dw,dh);
+    ctx.drawImage(img, sx,sy,a.frameW,a.frameH, -dw/2,drawY,dw,dh);
     ctx.restore();
   }
   function drawFighter(f){
